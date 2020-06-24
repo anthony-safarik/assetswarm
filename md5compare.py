@@ -7,9 +7,6 @@ Created on Wed Jun 24 11:59:00 2020
 """
 import csv
 
-src_dir = input('enter source folder csv').strip()
-dst_dir = input('enter copied folder csv').strip()
-
 def main(src_dir,dst_dir):
     src_md5_list = []
     dst_md5_list = []
@@ -24,4 +21,7 @@ def main(src_dir,dst_dir):
         if row['md5'] not in dst_md5_list:
             print(row['file path'],'not in dst')
 
+#####TESTING######
+src_dir = input('enter source folder csv').strip()
+dst_dir = input('enter copied folder csv').strip()
 main(src_dir,dst_dir)

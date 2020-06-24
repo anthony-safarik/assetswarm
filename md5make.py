@@ -50,11 +50,7 @@ def write_csv(csv_file, fieldnames, list_of_dicts):
             writer.writerow(dict)
 
 def main(inpath):
-    """
-    walks directory "inpath" and creates "inpath.csv"
-    headers are "file path" and "md5"
-    each row is a file in inpath
-    """
+    """requires inpath as an argument and creates csv file of folder contents inpath.csv"""
     if os.path.isdir(inpath):
         fieldnames = ['file path', 'md5']
         inpath_file_path_list = get_file_path_list(inpath)
@@ -63,5 +59,6 @@ def main(inpath):
         write_csv(csv_file, fieldnames, md5_dicts)
         if os.path.exists(csv_file): print(csv_file)
 
-inpath = input('enter source folder')
-main(inpath)
+#####TESTING######
+# inpath = input('enter source folder')
+# main(inpath)
