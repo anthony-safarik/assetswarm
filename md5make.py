@@ -6,6 +6,7 @@ def get_md5(inpath):
     """
     assumes inpath is a valid path to a file
     returns the md5 value for the file
+    NEEDS TO BE FIXED, THIS IS NOT PRODUCING PROPER MD5S
     """
     hash_md5 = hashlib.md5()
     with open(inpath, "rb") as f:
