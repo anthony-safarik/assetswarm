@@ -8,22 +8,12 @@ Created on Wed Jun 24 11:59:00 2020
 import csv
 import os
 
-def combine_dict_list(dict_list):
-    """dict_list is a list of dictionaries with values that are lists. this will combine several lists into one dict"""
-    new_dict = {}
-    for dict in dict_list:
-        print ('next')
-        for key in dict.keys():
-            print(key)
-            if not key in new_dict.keys():
-                new_dict[key] = dict[key]
-                #NOT FINISHED OR USED
-
 def csv_to_field_dict(csv_file,key_field,list_field,):
     """
     finds duplicate entries for an ID field in a csv file and makes a list of values from some secondary field
     opens csv_file and returns field_dict
     field_dict is a dictionary keyed to the values for key_field and listing the values in list_field
+    Wha?
     """
     field_dict = {}
     csv_dictreader = csv.DictReader(open(csv_file))

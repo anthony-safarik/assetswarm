@@ -2,7 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Jul  5 16:07:47 2020
-
+TODO:
+add feature: import csv to media
+add feature: implement dupe checking
+add feature: rename files
+add feature: validate dated folders
+add feature: validate md5
 @author: anthonysafarik
 """
 
@@ -27,6 +32,9 @@ class Library(object):
     def get_media(self):
         return self.media
 
+    def get_media_values(self):
+        return self.media.values()
+
     def get_media_list(self):
         """
         gets a list of paths from media keys and formats into a string
@@ -39,10 +47,9 @@ class Library(object):
                 media_list = i
             else:
                 media_list = media_list+'\n'+i
-            # media_list.append(i)
         return media_list
 
-    def crawl_tree(self, directory, hiddenfiles = False):
+    def crawl_tree(self, directory, filterfiles = [] ,hiddenfiles = False):
         files_in_tree = {}
         for (path,dirs,files) in os.walk(directory):
             for item in files:
@@ -57,7 +64,8 @@ class Library(object):
                     this_dict['directory'] = path
                     this_dict['file size'] = os.path.getsize(fp)
                     this_dict['file modified time'] = os.path.getmtime(fp)
-                    files_in_tree[fp] = this_dict
+                    if not filterfiles or file_extension.upper() in filterfiles:
+                        files_in_tree[fp] = this_dict
         return files_in_tree
 
     def print_media(self):
@@ -76,8 +84,8 @@ class Library(object):
                     all_tags.append(j)
         return all_tags
 
-    def add_directory_to_media(self,inpath):
-        dict = self.crawl_tree(inpath)
+    def add_directory_to_media(self, inpath, extenstions_to_filter):
+        dict = self.crawl_tree(inpath, extenstions_to_filter)
         self.media.update(dict)
 
     def add_exif_to_media(self,exif_metadata):
@@ -89,9 +97,7 @@ class Library(object):
 
             try:
                 file_path = exif_dict['SourceFile']
-                print(file_path)
                 if file_path in self.media.keys():
-                    print('.....its a match to the key')
                     self.media[file_path].update(exif_dict)
                 else:
                     print (self.media.keys())
@@ -109,10 +115,15 @@ class Library(object):
                 output = output.decode('utf-8')
                 md5 = output.split()[-1] #strip out the md5 part of the output string
                 self.media[fp]['md5'] = md5
-                print (self.media[fp]['file path'])
-                print (self.media[fp]['md5'])
             else:
                 print ('skipping md5',self.media[fp]['file path'])
+
+    def write_csv(self, csv_file, fieldnames, list_of_dicts):
+        with open(csv_file, 'w', newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for dict in list_of_dicts:
+                writer.writerow(dict)
 
     def dump_csv(self, csv_file):
         """
@@ -123,12 +134,32 @@ class Library(object):
 
         list_of_dicts = self.media.values()
         fieldnames = self.get_all_tags()
+        self.write_csv(csv_file, fieldnames, list_of_dicts)
 
-        with open(csv_file, 'w', newline='') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            for dict in list_of_dicts:
-                writer.writerow(dict)
+    def audition_asset_swarm_date(self):
+        for fpath in self.media.keys():
+            tags = self.media[fpath].keys()
+            earliest_candidate = "30000000000000"
+            this_tag = ''
+            for tag in tags:
+                if 'date' in tag.lower() and tag != "ASF:CreationDate":
+                    print(fpath,self.media[fpath][tag],tag)
+                    date_string = str(self.media[fpath][tag])
+
+                    digits = ''
+                    for char in date_string:
+                        if char.isdigit():
+                            digits = digits+char
+
+                    if len(digits) >= 14:
+                        this_tag = tag
+                        date_slice = digits[0:13]
+                        if int(date_slice) < int(earliest_candidate):
+                            earliest_candidate = date_slice
+
+            print (earliest_candidate,this_tag)
+            self.media[fpath]['AssetSwarm:EarlyDate'] = earliest_candidate
+
 
 class ExifTool(object):
     """
@@ -165,11 +196,14 @@ class ExifTool(object):
 
     def get_metadata(self, *filenames):
         return json.loads(self.execute("-G", "-j", "-n", *filenames))
+
 ###################TESTING####################
 
 l = Library()
-l.add_directory_to_media('/Users/anthonysafarik/Pictures/MediaFormats')
-l.add_md5_to_media()
+l.add_directory_to_media('/Volumes/Seagate8TB/DATA/Photos/2002',['.ARW','.JPG','.MP4','.MOV','.ASF'])
+# '/Users/anthonysafarik/Pictures/MediaFormats',['.ARW','.JPG'])
+# '/Users/anthonysafarik/Pictures/MediaFormats',['.AVI','.MOV','.MP4'])
+# l.add_md5_to_media()
 
 with ExifTool() as e:
     metadata = e.get_metadata(
@@ -178,10 +212,33 @@ with ExifTool() as e:
     )
 
 l.add_exif_to_media(metadata)
-for i in l.get_all_tags():
-    print (i)
+# for i in l.get_all_tags():
+#     print (i)
+#
+# print('_____')
+# date_tag_list = []
+# tags = l.get_all_tags()
+# for tag in tags:
+#     if 'date' in tag.lower():
+#         date_tag_list.append(tag)
+# for i in l.get_media_values():
+#     for tag in date_tag_list:
+#         try:
+#             digits = ''
+#             for char in str(i[tag]):
+#                 if char.isdigit():
+#                     digits = digits+char
+#
+#             if len(digits) >= 14:
+#                 date_slice = digits[0:13]
+#                 print (i['file name'], tag, date_slice)
+#
+#         except KeyError:
+#             pass
 
+l.audition_asset_swarm_date()
 l.dump_csv('/Users/Shared/temp/'+now+'.csv')
+
 ########################################
 #QuickTime:MajorBrand = mp42 = SM-J700T
 #xxxRIFF:Software = CanonMVI03 = Canon PowerShot S3 IS
