@@ -2,12 +2,15 @@
 # -*- coding: utf-8 -*-
 """
 Created on Sun Jul  5 16:07:47 2020
-TODO:
-add feature: import csv to media
-add feature: implement dupe checking
-add feature: rename files
-add feature: validate dated folders
-add feature: validate md5
+
+AssetSwarm is a tool to track digital data
+
+file information and camera metadata can be harvested
+features include:
+export/import to csv
+dupe checking
+rename files and folders based on metadata, such as adding a date or camera model
+
 @author: anthonysafarik
 """
 
@@ -25,7 +28,7 @@ class Library(object):
     def __init__(self):
         """
         Initiates Library object
-        media = dictionary of dictionaries. File paths are keys
+        media = dictionary of dictionaries.
         """
         self.media = {}
 
@@ -57,34 +60,35 @@ class Library(object):
                 fp = os.path.join(path,item)
                 if hiddenfiles == True or not item.startswith('.'):
                     file_name, file_extension = os.path.splitext(item)
-                    this_dict['file path'] = fp
-                    this_dict['file base name'] = file_name
-                    this_dict['file name'] = item
-                    this_dict['file extension'] = file_extension
-                    this_dict['directory'] = path
-                    this_dict['file size'] = os.path.getsize(fp)
-                    this_dict['file modified time'] = os.path.getmtime(fp)
+                    this_dict['AssetSwarm:FilePath'] = fp
+                    this_dict['AssetSwarm:FileBaseName'] = file_name
+                    this_dict['AssetSwarm:FileName'] = item
+                    this_dict['AssetSwarm:FileExtension'] = file_extension
+                    this_dict['AssetSwarm:Directory'] = path
+                    this_dict['AssetSwarm:FileSize'] = os.path.getsize(fp)
+                    this_dict['AssetSwarm:FileModifyTime'] = os.path.getmtime(fp)
+                    #check if we are supposed to be limiting the search to a certain file extension
                     if not filterfiles or file_extension.upper() in filterfiles:
                         files_in_tree[fp] = this_dict
         return files_in_tree
 
-    def print_media(self):
-        for key in self.media.keys():
-            print(self.media[key])
-
-    def iter_media_keys(self):
+    def iter_media_keys(self): #do we need this?
         for entry in self.media.keys():
             yield self.media[entry].keys()
 
     def get_all_tags(self):
         all_tags = []
-        for i in self.iter_media_keys():
+        for i in self.iter_media_keys(): #can this be simplified?
             for j in i:
                 if j not in all_tags:
                     all_tags.append(j)
         return all_tags
 
-    def add_directory_to_media(self, inpath, extenstions_to_filter):
+    def add_directory_to_media(self, inpath, extenstions_to_filter=[]):
+        """
+        scours a folder on the file system and adds file paths as dictionary keys to media
+        extenstions_to_filter is a list of the extentions to consider
+        """
         dict = self.crawl_tree(inpath, extenstions_to_filter)
         self.media.update(dict)
 
@@ -110,13 +114,13 @@ class Library(object):
     def add_md5_to_media(self):
         """adds md5 for each file in media"""
         for fp in self.media.keys():
-            if 'md5' not in self.media[fp].keys():
-                output = subprocess.check_output(['MD5',self.media[fp]['file path']])
+            if 'AssetSwarm:MD5' not in self.media[fp].keys() and 'AssetSwarm:FilePath' in self.media[fp].keys():
+                output = subprocess.check_output(['MD5',self.media[fp]['AssetSwarm:FilePath']])
                 output = output.decode('utf-8')
                 md5 = output.split()[-1] #strip out the md5 part of the output string
-                self.media[fp]['md5'] = md5
+                self.media[fp]['AssetSwarm:MD5'] = md5
             else:
-                print ('skipping md5',self.media[fp]['file path'])
+                print ('skipping md5, value exists or missing file')
 
     def write_csv(self, csv_file, fieldnames, list_of_dicts):
         with open(csv_file, 'w', newline='') as csvfile:
@@ -136,7 +140,19 @@ class Library(object):
         fieldnames = self.get_all_tags()
         self.write_csv(csv_file, fieldnames, list_of_dicts)
 
+    def import_csv(self,csv_file,id_field='AssetSwarm:FilePath'):
+        """
+        imports csv and adds to media
+        id_field is a field in the csv that is exepected to have a unique value for each row
+        """
+        dictreader = csv.DictReader(open(csv_file))
+        print ('importing from',csv_file)
+        for row in dictreader:
+            fp = row[id_field]
+            self.media[fp]=row
+
     def audition_asset_swarm_date(self):
+        #TODO sometimes produces weird results, replace this method with something more controlled
         for fpath in self.media.keys():
             tags = self.media[fpath].keys()
             earliest_candidate = "30000000000000"
@@ -168,6 +184,8 @@ class ExifTool(object):
     from implementation on stackoverflow
     https://stackoverflow.com/questions/10075115/call-exiftool-from-a-python-script
 
+    make sure that you only feed media files into this
+
     """
     sentinel = "{ready}\n"
 
@@ -191,7 +209,10 @@ class ExifTool(object):
         output = ""
         fd = self.process.stdout.fileno()
         while not output.endswith(self.sentinel):
-            output += os.read(fd, 4096).decode('utf-8')
+            try:
+                output += os.read(fd, 4096).decode('utf-8')
+            except UnicodeDecodeError:
+                print ('skipping something')
         return output[:-len(self.sentinel)]
 
     def get_metadata(self, *filenames):
@@ -199,45 +220,56 @@ class ExifTool(object):
 
 ###################TESTING####################
 
-l = Library()
-l.add_directory_to_media('/Volumes/Seagate8TB/DATA/Photos/2002',['.ARW','.JPG','.MP4','.MOV','.ASF'])
-# '/Users/anthonysafarik/Pictures/MediaFormats',['.ARW','.JPG'])
-# '/Users/anthonysafarik/Pictures/MediaFormats',['.AVI','.MOV','.MP4'])
+# l = Library()
+# l.add_directory_to_media('/Volumes/Seagate8TB/DATA/Photos/2004',['.ARW','.JPG','.MP4','.MOV','.ASF'])
 # l.add_md5_to_media()
-
-with ExifTool() as e:
-    metadata = e.get_metadata(
-    #'/Users/anthonysafarik/Pictures/MediaFormats/a7s.ARW\n/Users/anthonysafarik/Pictures/MediaFormats/a7s.JPG'
-    l.get_media_list()
-    )
-
-l.add_exif_to_media(metadata)
-# for i in l.get_all_tags():
-#     print (i)
 #
-# print('_____')
-# date_tag_list = []
-# tags = l.get_all_tags()
-# for tag in tags:
-#     if 'date' in tag.lower():
-#         date_tag_list.append(tag)
-# for i in l.get_media_values():
-#     for tag in date_tag_list:
-#         try:
-#             digits = ''
-#             for char in str(i[tag]):
-#                 if char.isdigit():
-#                     digits = digits+char
+# with ExifTool() as e:
+#     metadata = e.get_metadata(
+#     l.get_media_list()
+#     )
 #
-#             if len(digits) >= 14:
-#                 date_slice = digits[0:13]
-#                 print (i['file name'], tag, date_slice)
-#
-#         except KeyError:
-#             pass
+# l.add_exif_to_media(metadata)
+# l.audition_asset_swarm_date()
+# l.dump_csv('/Users/Shared/temp/'+now+'.csv')
 
-l.audition_asset_swarm_date()
-l.dump_csv('/Users/Shared/temp/'+now+'.csv')
+##############################################
+
+# l.import_csv('/Users/Shared/temp/'+now+'.csv')
+# media = l.get_media()
+# for i in media:
+#     ed = media[i]['AssetSwarm:EarlyDate']
+#     # print (ed)
+#     easy = ed[0:4]+'-'+ed[4:6]+'-'+ed[6:8]
+#     # print (easy)
+#     folder = os.path.split(media[i]['AssetSwarm:Directory'])[-1]
+#     if folder != easy:
+#         print ('no match',folder,easy)
+
+##############################################
+
+#down and dirty way to compare two lists
+
+# l = Library()
+# l.import_csv('/Users/anthonysafarik/Downloads/Version.csv','Version Name')
+# media = l.get_media()
+# sg_versions = []
+# for key in media.keys():
+#     sg_versions.append(key.upper())
+#
+# edl = Library()
+# edl.import_csv('/Users/anthonysafarik/Git/tom-edl/101_top_versions_lineup.csv','Version Name')
+#
+# edl_media = edl.get_media()
+# edl_versions = []
+# for key in edl_media.keys():
+#     edl_versions.append(key.replace('.MOV',''))
+#
+# for i in sg_versions:
+#     if i not in edl_versions:
+#         print (i)
+
+
 
 ########################################
 #QuickTime:MajorBrand = mp42 = SM-J700T
