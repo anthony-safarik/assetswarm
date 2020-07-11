@@ -3,13 +3,12 @@
 """
 Created on Sun Jul  5 16:07:47 2020
 
-AssetSwarm is a tool to track digital data
+a common interface for tracking files and metadata
 
-file information and camera metadata can be harvested
-features include:
+image metadata extracting with exiftool
 export/import to csv
 dupe checking
-rename files and folders based on metadata, such as adding a date or camera model
+rename files and folders
 
 @author: anthonysafarik
 """
@@ -23,14 +22,19 @@ import time
 now = time.strftime("%Y-%m-%d_%H%M%S")
 
 class Library(object):
-    """a place to hold media objects"""
+    """Library is a collection of files"""
 
     def __init__(self):
         """
-        Initiates Library object
-        media = dictionary of dictionaries.
+        Initiates a Library object
+        media = dictionary of dictionaries
+                individual files are keys
+                nested dictionaries contain named attributes
+        groups = dictionary of lists
+                keys representing attribute(s) to group by
         """
         self.media = {}
+        self.groups = {}
 
     def get_media(self):
         return self.media
